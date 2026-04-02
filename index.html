@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Taxas — Where2Go</title>
+<style>
+  :root {
+    --navy: #1E3A5F;
+    --blue: #2B5797;
+    --sky: #D9E8F5;
+    --green: #1E7145;
+    --green-bg: #E2EFDA;
+    --red: #C00000;
+    --red-bg: #FCE4D6;
+    --yellow: #FFF2CC;
+    --gray: #F5F5F5;
+    --border: #D0D0D0;
+    --white: #FFFFFF;
+    --text: #1a1a1a;
+    --muted: #666;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef2f7; color: var(--text); min-height: 100vh; }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+    color: white; padding: 20px 32px; display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 3px 16px rgba(0,0,0,0.2);
+  }
+  .header-icon { font-size: 32px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .header p  { font-size: 13px; opacity: .75; margin-top: 2px; }
+
+  /* ── Layout ── */
+  .app { max-width: 1280px; margin: 0 auto; padding: 24px 20px; }
+  .main-grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--white); border-radius: var(--radius);
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+  }
+  .card-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    font-weight: 700; font-size: 13px; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--navy);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-body { padding: 18px; }
+
+  /* ── Form controls ── */
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--navy); margin-bottom: 5px; margin-top: 14px; }
+  label:first-child { margin-top: 0; }
+  input[type=number], input[type=text], select {
+    width: 100%; padding: 9px 12px; border: 1.5px solid var(--border);
+    border-radius: 8px; font-size: 14px; background: var(--white);
+    transition: border .15s; outline: none; color: var(--text);
+  }
+  input[type=number]:focus, input[type=text]:focus, select:focus {
+    border-color: var(--blue); box-shadow: 0 0 0 3px rgba(43,87,151,.12);
+  }
+  .input-prefix { position: relative; }
+  .input-prefix span {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; color: var(--muted); pointer-events: none;
+  }
+  .input-prefix input { padding-left: 26px; }
+  .input-suffix { position: relative; }
+  .input-suffix span {
+    position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; color: var(--muted); pointer-events: none;
+  }
+  .input-suffix input { padding-right: 26px; }
+
+  /* ── Toggle ── */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 13px; font-weight: 600; color: var(--navy); }
+  .toggle-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #ccc; border-radius: 24px; transition: .2s;
+  }
+  .slider:before {
+    position: absolute; content: ""; height: 18px; width: 18px;
+    left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  }
+  input:checked + .slider { background: var(--blue); }
+  input:checked + .slider:before { transform: translateX(18px); }
+
+  /* ── MP fees table ── */
+  .mp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mp-table th { background: var(--sky); color: var(--navy); padding: 7px 10px; text-align: left; font-weight: 700; }
+  .mp-table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  .mp-table tr:hover td { background: #fafcff; }
+  .mp-table td:last-child { width: 80px; }
+  .mp-table input[type=number] { padding: 4px 8px; font-size: 12px; }
+  .badge-pix   { background: #e2efda; color: #1e7145; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; }
+  .badge-card  { background: #fff2cc; color: #7f6000; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; }
+  .badge-warn  { background: var(--red-bg); color: var(--red); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; }
+
+  /* ── Scenario builder ── */
+  .scenarios-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .scenarios-header h2 { font-size: 16px; font-weight: 700; color: var(--navy); }
+  .btn {
+    padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: all .15s; display: inline-flex;
+    align-items: center; gap: 6px;
+  }
+  .btn-primary { background: var(--blue); color: white; }
+  .btn-primary:hover { background: var(--navy); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-danger { background: var(--red-bg); color: var(--red); }
+  .btn-danger:hover { background: #f5c6c6; }
+  .btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--muted); }
+  .btn-ghost:hover { background: var(--gray); }
+
+  /* ── Scenario cards ── */
+  .scenarios-grid { display: grid; gap: 16px; }
+  .scenario-card {
+    background: var(--white); border-radius: var(--radius);
+    border: 2px solid var(--border); box-shadow: var(--shadow);
+    overflow: hidden; transition: border-color .2s;
+  }
+  .scenario-card:hover { border-color: var(--blue); }
+  .scenario-head {
+    padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .scenario-head input[type=text] {
+    font-weight: 700; font-size: 14px; border: none; outline: none;
+    flex: 1; background: transparent; color: var(--navy);
+  }
+  .scenario-head input[type=text]:focus { border-bottom: 2px solid var(--blue); }
+  .color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+
+  .scenario-body { padding: 16px; }
+  .s-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .s-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .s-field label { font-size: 11px; margin-bottom: 3px; }
+  .s-field input, .s-field select { font-size: 13px; padding: 7px 10px; }
+
+  /* ── Result box ── */
+  .result-row {
+    display: flex; gap: 12px; margin-top: 14px; padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .result-box {
+    flex: 1; border-radius: 10px; padding: 12px 14px; text-align: center;
+  }
+  .result-box .r-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; opacity: .7; }
+  .result-box .r-value { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .result-box .r-sub   { font-size: 11px; margin-top: 2px; opacity: .65; }
+  .rb-client   { background: #EBF3FB; color: var(--navy); }
+  .rb-fee      { background: var(--red-bg); color: var(--red); }
+  .rb-net      { background: var(--green-bg); color: var(--green); }
+  .rb-pct      { background: var(--yellow); color: #7f6000; }
+
+  .fee-breakdown {
+    margin-top: 10px; padding: 10px 12px; background: var(--gray);
+    border-radius: 8px; font-size: 12px;
+  }
+  .fee-breakdown .fb-row {
+    display: flex; justify-content: space-between; padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .fee-breakdown .fb-row:last-child { border-bottom: none; font-weight: 700; color: var(--red); }
+  .fee-breakdown .fb-label { color: var(--muted); }
+  .fee-breakdown .fb-value { font-weight: 600; }
+
+  /* ── Comparison table ── */
+  .compare-section { margin-top: 20px; }
+  .compare-section h2 { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 12px; }
+  .compare-table-wrap { overflow-x: auto; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  .compare-table th { background: var(--navy); color: white; padding: 11px 16px; text-align: center; font-size: 12px; white-space: nowrap; }
+  .compare-table th:first-child { text-align: left; }
+  .compare-table td { padding: 10px 16px; border-bottom: 1px solid #f0f0f0; text-align: center; background: white; }
+  .compare-table td:first-child { text-align: left; font-weight: 600; color: var(--navy); background: var(--sky); }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table tr:hover td { background: #fafcff; }
+  .compare-table tr:hover td:first-child { background: var(--sky); }
+  .cell-green { color: var(--green); font-weight: 700; }
+  .cell-red   { color: var(--red);   font-weight: 700; }
+  .cell-best  { background: var(--green-bg) !important; color: var(--green); font-weight: 800; }
+
+  /* ── Repasse mode selector ── */
+  .mode-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .mode-tab {
+    flex: 1; padding: 8px; text-align: center; border-radius: 8px;
+    border: 2px solid var(--border); cursor: pointer; font-size: 12px; font-weight: 600;
+    color: var(--muted); transition: all .15s; background: var(--white);
+  }
+  .mode-tab.active { border-color: var(--blue); background: var(--sky); color: var(--blue); }
+
+  /* ── Collapse section ── */
+  .collapsible-header {
+    cursor: pointer; user-select: none;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .collapsible-header:hover { opacity: .8; }
+  .chevron { font-size: 12px; transition: transform .2s; }
+  .chevron.open { transform: rotate(180deg); }
+  .collapsible-body { overflow: hidden; transition: max-height .3s ease; }
+
+  /* ── Pill ── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  }
+  .pill-blue   { background: var(--sky);    color: var(--navy); }
+  .pill-green  { background: var(--green-bg); color: var(--green); }
+  .pill-red    { background: var(--red-bg);   color: var(--red); }
+  .pill-yellow { background: var(--yellow);   color: #7f6000; }
+
+  /* ── Alert box ── */
+  .alert { border-radius: 8px; padding: 10px 14px; font-size: 12px; display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; }
+  .alert-info { background: var(--sky); color: var(--navy); border-left: 3px solid var(--blue); }
+  .alert-warn { background: var(--yellow); color: #7f6000; border-left: 3px solid #e0a000; }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .s-grid-3 { grid-template-columns: 1fr 1fr; }
+    .result-row { flex-wrap: wrap; }
+    .result-box { min-width: calc(50% - 6px); }
+  }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">💸</div>
+  <div>
+    <h1>Simulador de Taxas — Where2Go</h1>
+    <p>Compare cenários de comissão e repasse ao cliente em tempo real</p>
+  </div>
+</div>
+
+<div class="app">
+  <div class="main-grid">
+
+    <!-- ── LEFT: Config panel ── -->
+    <div>
+
+      <!-- Taxas MP -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header collapsible-header" onclick="toggleSection('mp-body','mp-chev')">
+          💳 Taxas Mercado Pago
+          <span class="chevron open" id="mp-chev">▼</span>
+        </div>
+        <div class="collapsible-body" id="mp-body" style="max-height:600px">
+          <div class="card-body" style="padding:0">
+            <table class="mp-table">
+              <thead>
+                <tr><th>Meio de pagamento</th><th>Taxa MP</th></tr>
+              </thead>
+              <tbody id="mp-tbody"></tbody>
+            </table>
+            <div style="padding:10px 14px">
+              <div class="alert alert-info">
+                💡 Taxas baseadas nas referências públicas do Mercado Pago. Editáveis para personalizar.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Where2Go config -->
+      <div class="card">
+        <div class="card-header">🏢 Configurações Where2Go</div>
+        <div class="card-body">
+          <label>Comissão padrão Where2Go (%)</label>
+          <div class="input-suffix">
+            <input type="number" id="default-w2g" value="5" min="0" max="50" step="0.1" oninput="recalcAll()">
+            <span>%</span>
+          </div>
+          <div class="alert alert-warn" style="margin-top:10px">
+            ⚠️ Cada cenário pode ter uma comissão personalizada diferente desta.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── RIGHT: Scenarios ── -->
+    <div>
+      <div class="scenarios-header">
+        <h2>🎯 Cenários de Simulação</h2>
+        <button class="btn btn-primary" onclick="addScenario()">
+          ＋ Novo Cenário
+        </button>
+      </div>
+
+      <div class="scenarios-grid" id="scenarios-container"></div>
+
+      <!-- Comparison table -->
+      <div class="compare-section">
+        <h2>📊 Comparativo de Cenários</h2>
+        <div class="compare-table-wrap">
+          <table class="compare-table" id="compare-table">
+            <thead id="compare-head"></thead>
+            <tbody id="compare-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── MP fee reference ──────────────────────────────────────────────────────────
+const MP_METHODS = [
+  { id: 'pix',   label: 'PIX',                  rate: 0.0099, badge: 'badge-pix',  badgeTxt: 'PIX'  },
+  { id: 'deb',   label: 'Débito / Saldo MP',     rate: 0.0099, badge: 'badge-pix',  badgeTxt: 'PIX'  },
+  { id: 'c1x',   label: 'Cartão 1x (à vista)',   rate: 0.0299, badge: 'badge-card', badgeTxt: '1x'   },
+  { id: 'c2x',   label: 'Cartão 2x',             rate: 0.0498, badge: 'badge-card', badgeTxt: '2x'   },
+  { id: 'c3x',   label: 'Cartão 3x',             rate: 0.0648, badge: 'badge-card', badgeTxt: '3x'   },
+  { id: 'c4x',   label: 'Cartão 4x',             rate: 0.0798, badge: 'badge-card', badgeTxt: '4x'   },
+  { id: 'c5x',   label: 'Cartão 5x',             rate: 0.0948, badge: 'badge-card', badgeTxt: '5x'   },
+  { id: 'c6x',   label: 'Cartão 6x',             rate: 0.1098, badge: 'badge-card', badgeTxt: '6x'   },
+  { id: 'c12x',  label: 'Cartão 7–12x',          rate: 0.1333, badge: 'badge-warn', badgeTxt: '7–12x'},
+];
+
+const COLORS = ['#2B5797','#1E7145','#C00000','#7F3F00','#5B2D8E','#006B6B','#8B4513','#1a1a1a'];
+
+let scenarios = [];
+let scenarioCounter = 0;
+
+// ── Build MP table ────────────────────────────────────────────────────────────
+function buildMPTable() {
+  const tbody = document.getElementById('mp-tbody');
+  tbody.innerHTML = MP_METHODS.map(m => `
+    <tr>
+      <td>
+        ${m.label}
+        <span class="${m.badge}" style="margin-left:6px">${m.badgeTxt}</span>
+      </td>
+      <td>
+        <div class="input-suffix" style="max-width:80px">
+          <input type="number" id="mp-${m.id}" value="${(m.rate*100).toFixed(2)}"
+            min="0" max="100" step="0.01"
+            style="text-align:right;padding-right:22px"
+            oninput="updateMPRate('${m.id}', this.value); recalcAll()">
+          <span>%</span>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function getMPRate(id) {
+  const el = document.getElementById(`mp-${id}`);
+  return el ? parseFloat(el.value || 0) / 100 : 0;
+}
+
+function updateMPRate(id, val) {
+  const method = MP_METHODS.find(m => m.id === id);
+  if (method) method.rate = parseFloat(val || 0) / 100;
+}
+
+// ── Scenario model ────────────────────────────────────────────────────────────
+function createScenario(name, color, mode, repasse, w2g, mp_id, base) {
+  return {
+    id: ++scenarioCounter,
+    name: name,
+    color: color,
+    mode: mode,       // 'absorb' | 'repasse_pct' | 'repasse_exact'
+    repasse: repasse, // % added to price (for repasse_pct)
+    w2g: w2g,         // where2go commission %
+    mp_id: mp_id,     // mp method id
+    base: base,       // base price
+  };
+}
+
+function defaultScenarios() {
+  const w2g = parseFloat(document.getElementById('default-w2g')?.value || 5);
+  scenarios = [
+    createScenario('Absorve tudo — PIX',        COLORS[0], 'absorb',        0,    w2g, 'pix',  700),
+    createScenario('Absorve tudo — Cartão 2x',  COLORS[2], 'absorb',        0,    w2g, 'c2x',  700),
+    createScenario('Repasse ao cliente — PIX',  COLORS[1], 'repasse_pct',   12,   w2g, 'pix',  700),
+    createScenario('Repasse — Cartão 2x',       COLORS[3], 'repasse_pct',   12,   w2g, 'c2x',  700),
+  ];
+  renderAll();
+}
+
+// ── Add / Remove ──────────────────────────────────────────────────────────────
+function addScenario() {
+  const w2g = parseFloat(document.getElementById('default-w2g')?.value || 5);
+  const s = createScenario(
+    `Cenário ${scenarioCounter + 1}`,
+    COLORS[scenarioCounter % COLORS.length],
+    'repasse_pct', 12, w2g, 'pix', 700
+  );
+  scenarios.push(s);
+  renderAll();
+}
+
+function removeScenario(id) {
+  scenarios = scenarios.filter(s => s.id !== id);
+  renderAll();
+}
+
+// ── Calculation ───────────────────────────────────────────────────────────────
+function calc(s) {
+  const mpRate   = getMPRate(s.mp_id);
+  const w2gRate  = s.w2g / 100;
+  const base     = s.base;
+  const repPct   = s.repasse / 100;
+
+  let sitePrice, w2gFee, mpFee, netSeller;
+
+  if (s.mode === 'absorb') {
+    // Vendedor absorve tudo
+    sitePrice = base;
+    w2gFee    = base * w2gRate;
+    mpFee     = base * mpRate;
+    netSeller = base - w2gFee - mpFee;
+  } else if (s.mode === 'repasse_pct') {
+    // Preço no site = base × (1 + repasse%)
+    sitePrice = base * (1 + repPct);
+    w2gFee    = sitePrice * w2gRate;
+    mpFee     = sitePrice * mpRate;
+    netSeller = sitePrice - w2gFee - mpFee;
+  } else {
+    // repasse_exact: base / (1 - w2g - mp) — garante receber exatamente base
+    const totalRate = w2gRate + mpRate;
+    if (totalRate >= 1) { sitePrice = base * 2; w2gFee = 0; mpFee = 0; netSeller = base; }
+    else {
+      sitePrice = base / (1 - totalRate);
+      w2gFee    = sitePrice * w2gRate;
+      mpFee     = sitePrice * mpRate;
+      netSeller = base;
+    }
+  }
+
+  const totalFee    = w2gFee + mpFee;
+  const totalFeePct = totalFee / sitePrice;
+  const netPct      = netSeller / base;
+  const clientExtra = sitePrice - base;
+
+  return { sitePrice, w2gFee, mpFee, totalFee, totalFeePct, netSeller, netPct, clientExtra, mpRate, w2gRate };
+}
+
+// ── Render all ────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderScenarios();
+  renderCompareTable();
+}
+
+function recalcAll() {
+  // Update w2g default from input
+  const defaultW2G = parseFloat(document.getElementById('default-w2g')?.value || 5);
+  renderAll();
+}
+
+// ── Render scenario cards ─────────────────────────────────────────────────────
+function renderScenarios() {
+  const container = document.getElementById('scenarios-container');
+  container.innerHTML = scenarios.map(s => renderScenarioCard(s)).join('');
+}
+
+function getMPLabel(id) {
+  return MP_METHODS.find(m => m.id === id)?.label || id;
+}
+
+function renderScenarioCard(s) {
+  const r = calc(s);
+  const mpOptions = MP_METHODS.map(m =>
+    `<option value="${m.id}" ${m.id === s.mp_id ? 'selected' : ''}>${m.label} (${(m.rate*100).toFixed(2)}%)</option>`
+  ).join('');
+
+  const modeActive = (mode) => s.mode === mode ? 'active' : '';
+
+  return `
+  <div class="scenario-card" id="sc-${s.id}">
+    <div class="scenario-head">
+      <div class="color-dot" style="background:${s.color}"></div>
+      <input type="text" value="${s.name}"
+        onchange="updateField(${s.id},'name',this.value)"
+        onblur="updateField(${s.id},'name',this.value)">
+      <button class="btn btn-danger btn-sm" onclick="removeScenario(${s.id})">✕</button>
+    </div>
+    <div class="scenario-body">
+
+      <!-- Mode tabs -->
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Modo de repasse</div>
+        <div class="mode-tabs">
+          <div class="mode-tab ${modeActive('absorb')}" onclick="setMode(${s.id},'absorb')">
+            🔴 Absorve tudo
+          </div>
+          <div class="mode-tab ${modeActive('repasse_pct')}" onclick="setMode(${s.id},'repasse_pct')">
+            🟢 Repasse %
+          </div>
+          <div class="mode-tab ${modeActive('repasse_exact')}" onclick="setMode(${s.id},'repasse_exact')">
+            🎯 Exato
+          </div>
+        </div>
+        ${s.mode === 'absorb' ? `<div class="alert alert-warn" style="padding:7px 11px;font-size:11px">Vendedor absorve todas as taxas. Cliente paga apenas o preço base.</div>` : ''}
+        ${s.mode === 'repasse_pct' ? `<div class="alert alert-info" style="padding:7px 11px;font-size:11px">Preço no site = base × (1 + repasse%). Simples e intuitivo.</div>` : ''}
+        ${s.mode === 'repasse_exact' ? `<div class="alert alert-info" style="padding:7px 11px;font-size:11px">Fórmula exata: garante que o vendedor receba <strong>exatamente</strong> o preço base após todas as taxas.</div>` : ''}
+      </div>
+
+      <div class="s-grid-3">
+        <div class="s-field">
+          <label>Preço base (R$)</label>
+          <div class="input-prefix">
+            <span>R$</span>
+            <input type="number" value="${s.base}" min="1" step="0.01"
+              oninput="updateField(${s.id},'base',+this.value)">
+          </div>
+        </div>
+        <div class="s-field">
+          <label>Comissão Where2Go</label>
+          <div class="input-suffix">
+            <input type="number" value="${s.w2g}" min="0" max="50" step="0.1"
+              oninput="updateField(${s.id},'w2g',+this.value)">
+            <span>%</span>
+          </div>
+        </div>
+        <div class="s-field" style="${s.mode === 'absorb' || s.mode === 'repasse_exact' ? 'opacity:.4;pointer-events:none' : ''}">
+          <label>Repasse ao cliente</label>
+          <div class="input-suffix">
+            <input type="number" value="${s.repasse}" min="0" max="100" step="0.1"
+              oninput="updateField(${s.id},'repasse',+this.value)">
+            <span>%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="s-field" style="margin-top:12px">
+        <label>Meio de pagamento</label>
+        <select onchange="updateField(${s.id},'mp_id',this.value)">${mpOptions}</select>
+      </div>
+
+      <!-- Results -->
+      <div class="result-row">
+        <div class="result-box rb-client">
+          <div class="r-label">Preço no site</div>
+          <div class="r-value">${fmt(r.sitePrice)}</div>
+          <div class="r-sub">${r.clientExtra > 0.01 ? `+${fmt(r.clientExtra)} vs. base` : 'Sem acréscimo'}</div>
+        </div>
+        <div class="result-box rb-fee">
+          <div class="r-label">Total de taxas</div>
+          <div class="r-value">${fmt(r.totalFee)}</div>
+          <div class="r-sub">${pct(r.totalFeePct)} do preço site</div>
+        </div>
+        <div class="result-box rb-net">
+          <div class="r-label">Vendedor recebe</div>
+          <div class="r-value">${fmt(r.netSeller)}</div>
+          <div class="r-sub">${pct(r.netPct)} do preço base</div>
+        </div>
+        <div class="result-box rb-pct">
+          <div class="r-label">Taxa total</div>
+          <div class="r-value">${pct(r.totalFeePct)}</div>
+          <div class="r-sub">MP: ${pct(r.mpRate)} + W2G: ${pct(r.w2gRate)}</div>
+        </div>
+      </div>
+
+      <!-- Breakdown -->
+      <div class="fee-breakdown">
+        <div class="fb-row">
+          <span class="fb-label">Preço base do produto</span>
+          <span class="fb-value">${fmt(s.base)}</span>
+        </div>
+        ${s.mode !== 'absorb' ? `<div class="fb-row">
+          <span class="fb-label">Taxa de conveniência cobrada do cliente</span>
+          <span class="fb-value" style="color:var(--blue)">+ ${fmt(r.clientExtra)}</span>
+        </div>` : ''}
+        <div class="fb-row">
+          <span class="fb-label">Preço que o cliente paga</span>
+          <span class="fb-value">${fmt(r.sitePrice)}</span>
+        </div>
+        <div class="fb-row">
+          <span class="fb-label">(−) Comissão Where2Go ${pct(r.w2gRate)}</span>
+          <span class="fb-value" style="color:var(--red)">− ${fmt(r.w2gFee)}</span>
+        </div>
+        <div class="fb-row">
+          <span class="fb-label">(−) Taxa Mercado Pago ${pct(r.mpRate)} · ${getMPLabel(s.mp_id)}</span>
+          <span class="fb-value" style="color:var(--red)">− ${fmt(r.mpFee)}</span>
+        </div>
+        <div class="fb-row">
+          <span class="fb-label">✅ Vendedor recebe líquido</span>
+          <span class="fb-value" style="color:var(--green)">= ${fmt(r.netSeller)}</span>
+        </div>
+      </div>
+
+    </div>
+  </div>`;
+}
+
+// ── Comparison table ──────────────────────────────────────────────────────────
+function renderCompareTable() {
+  if (scenarios.length === 0) return;
+  const results = scenarios.map(s => ({ s, r: calc(s) }));
+
+  const maxNet = Math.max(...results.map(x => x.r.netSeller));
+  const minFee = Math.min(...results.map(x => x.r.totalFeePct));
+
+  const head = document.getElementById('compare-head');
+  const body = document.getElementById('compare-body');
+
+  head.innerHTML = `<tr>
+    <th>Métrica</th>
+    ${results.map(({s}) => `<th><span class="color-dot" style="background:${s.color};display:inline-block;margin-right:6px;vertical-align:middle"></span>${s.name}</th>`).join('')}
+  </tr>`;
+
+  const rows = [
+    { label: '💰 Preço base', fn: ({s,r}) => fmt(s.base), best: null },
+    { label: '🏷️ Preço no site (cliente paga)', fn: ({s,r}) => fmt(r.sitePrice), best: null },
+    { label: '↳ Acréscimo ao cliente',  fn: ({s,r}) => r.clientExtra > 0.01 ? `+${fmt(r.clientExtra)}` : '—', best: null },
+    { label: '(−) Comissão Where2Go',   fn: ({s,r}) => `${fmt(r.w2gFee)} (${pct(r.w2gRate)})`, best: null },
+    { label: '(−) Taxa Mercado Pago',   fn: ({s,r}) => `${fmt(r.mpFee)} (${pct(r.mpRate)})`, best: null },
+    { label: '📊 % total de taxas',     fn: ({s,r}) => pct(r.totalFeePct), best: 'min_fee' },
+    { label: '✅ Vendedor recebe',      fn: ({s,r}) => fmt(r.netSeller), best: 'max_net' },
+    { label: '📈 % do preço base retido', fn: ({s,r}) => pct(r.netPct), best: 'max_net' },
+  ];
+
+  body.innerHTML = rows.map(row => `
+    <tr>
+      <td>${row.label}</td>
+      ${results.map(({s,r}) => {
+        let cls = '';
+        if (row.best === 'max_net' && r.netSeller === maxNet) cls = 'cell-best';
+        else if (row.best === 'min_fee' && r.totalFeePct === minFee) cls = 'cell-best';
+        return `<td class="${cls}">${row.fn({s,r})}</td>`;
+      }).join('')}
+    </tr>
+  `).join('');
+}
+
+// ── Update helpers ────────────────────────────────────────────────────────────
+function updateField(id, field, val) {
+  const s = scenarios.find(s => s.id === id);
+  if (!s) return;
+  s[field] = val;
+  renderAll();
+}
+
+function setMode(id, mode) {
+  updateField(id, 'mode', mode);
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+function fmt(n) {
+  return 'R$ ' + (n || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+function pct(n) {
+  return ((n || 0) * 100).toFixed(2).replace('.', ',') + '%';
+}
+
+// ── Collapsible ───────────────────────────────────────────────────────────────
+function toggleSection(bodyId, chevId) {
+  const body = document.getElementById(bodyId);
+  const chev = document.getElementById(chevId);
+  if (body.style.maxHeight === '0px') {
+    body.style.maxHeight = '600px';
+    chev.classList.add('open');
+  } else {
+    body.style.maxHeight = '0px';
+    chev.classList.remove('open');
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildMPTable();
+defaultScenarios();
+</script>
+</body>
+</html>
